@@ -1815,6 +1815,41 @@ async function renderEventForm(eventId = null, defaultType = '') {
     </div>
   `).join('');
 
+  function appendAttendeeRow({ name = '', email = '', role = '', status = 'Confirmed' } = {}) {
+    const row = document.createElement('div');
+    row.className = 'row g-2 attendee-row align-items-end';
+    row.innerHTML = `
+      <div class="col-md-3">
+        <label class="form-label">Name</label>
+        <input class="form-control" name="attendeeName[]" value="${name}" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" name="attendeeEmail[]" value="${email}" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Director role</label>
+        <select class="form-select" name="attendeeRole[]">
+          <option value="" ${!role ? 'selected' : ''}>-- None --</option>
+          <option value="CD" ${role === 'CD' ? 'selected' : ''}>Country Director (CD)</option>
+          <option value="RD" ${role === 'RD' ? 'selected' : ''}>Regional Director (RD)</option>
+          <option value="Both" ${role === 'Both' ? 'selected' : ''}>Both</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="attendeeStatus[]">
+          ${['Confirmed','Pending','Cancelled'].map(option => `<option value="${option}" ${status === option ? 'selected' : ''}>${option}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-md-1 d-flex justify-content-end">
+        <button type="button" class="btn btn-outline-danger btn-sm remove-attendee-row">Remove</button>
+      </div>
+    `;
+    row.querySelector('.remove-attendee-row').addEventListener('click', () => row.remove());
+    attendeeList.appendChild(row);
+  }
+
   const content = `
     <div class="card p-4">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -1870,7 +1905,13 @@ async function renderEventForm(eventId = null, defaultType = '') {
           <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
               <h5 class="mb-0">Attendee List</h5>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="add-attendee-row">Add attendee</button>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="add-attendee-row">Add attendee</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="import-attendee-excel">Import Excel</button>
+              </div>
+            </div>
+            <div class="small text-muted mb-2">
+              Use columns like Name, Email, Director role, Status, or Attendee Name / Attendee Email in your Excel sheet.
             </div>
             <div id="event-attendee-list" class="d-grid gap-3">
               ${attendeeRows}
@@ -1887,41 +1928,67 @@ async function renderEventForm(eventId = null, defaultType = '') {
   const attendeeList = document.getElementById('event-attendee-list');
 
   addAttendeeButton?.addEventListener('click', () => {
-    const rowCount = attendeeList.querySelectorAll('.attendee-row').length;
-    const row = document.createElement('div');
-    row.className = 'row g-2 attendee-row align-items-end';
-    row.innerHTML = `
-      <div class="col-md-3">
-        <label class="form-label">Name</label>
-        <input class="form-control" name="attendeeName[]" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-control" name="attendeeEmail[]" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Director role</label>
-        <select class="form-select" name="attendeeRole[]">
-          <option value="" selected>-- None --</option>
-          <option value="CD">Country Director (CD)</option>
-          <option value="RD">Regional Director (RD)</option>
-          <option value="Both">Both</option>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">Status</label>
-        <select class="form-select" name="attendeeStatus[]">
-          <option value="Confirmed" selected>Confirmed</option>
-          <option value="Pending">Pending</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
-      </div>
-      <div class="col-md-1 d-flex justify-content-end">
-        <button type="button" class="btn btn-outline-danger btn-sm remove-attendee-row">Remove</button>
-      </div>
-    `;
-    attendeeList.appendChild(row);
-    row.querySelector('.remove-attendee-row').addEventListener('click', () => row.remove());
+    appendAttendeeRow();
+  });
+
+  document.getElementById('import-attendee-excel')?.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.csv';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      try {
+        const rows = await parseSpreadsheetFile(file);
+        const imported = [];
+
+        rows.forEach((row) => {
+          const cleaned = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, normalizeCellValue(value)]));
+          const name = getMappedValue(cleaned, ['name','fullname','fullName','attendeename','guestname','participantname','nameofattendee']) || '';
+          const email = getMappedValue(cleaned, ['email','emailaddress','attendeeemail','guestemail','participantemail']) || '';
+          const role = getMappedValue(cleaned, ['directorrole','role','attendeerole','directorshiprole']) || '';
+          const status = getMappedValue(cleaned, ['status','attendancestatus','attendeestatus']) || 'Confirmed';
+          const attendeeNames = splitAttendeeValues(getMappedValue(cleaned, ['attendeenames','guestnames','participants','names']));
+          const attendeeEmails = splitAttendeeValues(getMappedValue(cleaned, ['attendeeemails','guestemails','participantemails','emails']));
+
+          if (name || email || attendeeNames.length || attendeeEmails.length) {
+            if (name && email) {
+              imported.push({ name, email, role, status });
+              return;
+            }
+
+            if (attendeeNames.length || attendeeEmails.length) {
+              const maxEntries = Math.max(attendeeNames.length, attendeeEmails.length, 0);
+              for (let index = 0; index < maxEntries; index++) {
+                const entryName = attendeeNames[index] || '';
+                const entryEmail = attendeeEmails[index] || '';
+                if (entryName || entryEmail) {
+                  imported.push({ name: entryName, email: entryEmail, role, status });
+                }
+              }
+              return;
+            }
+
+            if (name || email) {
+              imported.push({ name, email, role, status });
+            }
+          }
+        });
+
+        if (!imported.length) {
+          window.alert('No attendee rows were found in the selected file.');
+          return;
+        }
+
+        attendeeList.innerHTML = '';
+        imported.forEach((entry) => appendAttendeeRow(entry));
+        window.alert(`${imported.length} attendee${imported.length === 1 ? '' : 's'} imported.`);
+      } catch (error) {
+        window.alert('Unable to import attendees from the selected file.');
+      }
+    };
+    input.click();
   });
 
   attendeeList?.querySelectorAll('.remove-attendee-row').forEach((button) => {
