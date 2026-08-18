@@ -837,8 +837,9 @@ async function renderAdminPanel() {
                 <input type="email" class="form-control" name="email" placeholder="user@example.com" />
               </div>
               <div class="col-12">
-                <label class="form-label">Temporary Password (user must change on first login)</label>
-                <input type="text" class="form-control" name="tempPassword" placeholder="Enter temporary password" />
+                <label class="form-label">Temporary Password</label>
+                <input type="text" class="form-control" name="tempPassword" placeholder="Optional: leave blank to auto-generate" />
+                <small class="text-muted">If left blank, the system generates a temporary password and the user must change it on first login.</small>
               </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-primary">Create User</button>
@@ -862,6 +863,7 @@ async function renderAdminPanel() {
                 <th>Role</th>
                 <th>First Login</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -872,6 +874,9 @@ async function renderAdminPanel() {
                   <td><span class="badge ${user.role === 'admin' ? 'bg-danger' : 'bg-secondary'}">${user.role}</span></td>
                   <td>${user.isFirstLogin ? '✓ Pending' : '—'}</td>
                   <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    ${user.role !== 'admin' ? `<button class="btn btn-sm btn-outline-danger" type="button" data-delete-user-id="${user.id}">Delete</button>` : '<span class="text-muted small">Admin</span>'}
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -892,23 +897,43 @@ async function renderAdminPanel() {
     const email = form.elements.email.value;
     const tempPassword = form.elements.tempPassword.value;
 
-    if (!email || !tempPassword) {
-      feedback.innerHTML = '<div class="alert alert-danger">Email and temporary password are required</div>';
+    if (!email) {
+      feedback.innerHTML = '<div class="alert alert-danger">Email is required</div>';
       return;
     }
 
     try {
-      await fetchJson(`${API_BASE}/admin/users`, {
+      const response = await fetchJson(`${API_BASE}/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, fullName, tempPassword })
       });
-      feedback.innerHTML = '<div class="alert alert-success">User created successfully!</div>';
+
+      const generatedPassword = response.user && response.user.password ? response.user.password : tempPassword || 'Generated password not shown';
+      feedback.innerHTML = `<div class="alert alert-success">User created successfully. Temporary password: <strong>${generatedPassword}</strong></div>`;
       form.reset();
-      setTimeout(() => renderAdminPanel(), 1500);
+      setTimeout(() => renderAdminPanel(), 2000);
     } catch (error) {
       feedback.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
     }
+  });
+
+  document.querySelectorAll('[data-delete-user-id]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const userId = button.getAttribute('data-delete-user-id');
+      if (!userId) return;
+
+      if (!window.confirm('Are you sure you want to delete this user?')) {
+        return;
+      }
+
+      try {
+        await fetchJson(`${API_BASE}/admin/users/${userId}`, { method: 'DELETE' });
+        renderAdminPanel();
+      } catch (error) {
+        window.alert(error.message || 'Unable to delete the user.');
+      }
+    });
   });
 }
 
@@ -1164,7 +1189,7 @@ async function renderEvents() {
         </div>
       </div>
       ${isAdmin ? `<div class="alert alert-secondary mb-3">
-        <strong>Import format:</strong> use columns such as Name, Type, Start Date, End Date, Venue, Coordinator, Expected Attendees, Department, Status.
+        <strong>Import format:</strong> use columns such as Name, Type, Start Date, End Date, Venue, Coordinator, Expected Attendees, Department, Status, and Attendee Name / Attendee Email (or Attendee Names / Attendee Emails) for the guest roster.
       </div>` : ''}
       ${events.length === 0 ? `<div class="alert alert-info mb-3">No events yet. Create the first one to start building your timeline.</div>` : ''}
       <div class="table-responsive">
