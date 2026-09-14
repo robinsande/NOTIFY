@@ -2214,12 +2214,24 @@ async function deleteAttendee(attendeeId) {
 window.addEventListener('DOMContentLoaded', () => {
   const hashRoute = window.location.hash.replace(/^#\/?/, '').trim();
   const savedState = restoreAppState();
+  const validRoutes = ['dashboard','events','calendar','tasks','attendees','reminders','documents','reports','departments','eventTypes','admin'];
+  const hasSavedUser = savedState.authenticated && savedState.user && savedState.view;
 
-  if (hashRoute && ['dashboard','events','calendar','tasks','attendees','reminders','documents','reports','departments','eventTypes','admin'].includes(hashRoute)) {
-    navigateToRoute(hashRoute);
-  } else if (savedState.authenticated && savedState.view) {
-    navigateToSavedView(savedState.view);
-  } else {
+  try {
+    const startupRender = hashRoute && validRoutes.includes(hashRoute)
+      ? navigateToRoute(hashRoute)
+      : hasSavedUser
+        ? navigateToSavedView(savedState.view)
+        : renderLogin();
+
+    Promise.resolve(startupRender).catch((error) => {
+      console.error('Unable to load NOTIFY', error);
+      clearAppState();
+      renderLogin();
+    });
+  } catch (error) {
+    console.error('Unable to load NOTIFY', error);
+    clearAppState();
     renderLogin();
   }
 });
