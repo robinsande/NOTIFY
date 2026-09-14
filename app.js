@@ -144,6 +144,16 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
+function adminRequestOptions(options = {}) {
+  return {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      'X-Notify-User-Id': currentUser?.id || ''
+    }
+  };
+}
+
 function normalizeHeader(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
@@ -818,7 +828,7 @@ async function renderAdminPanel() {
 
   saveAppState('admin', true);
 
-  const users = await fetchJson(`${API_BASE}/admin/users`).catch(() => []);
+  const users = await fetchJson(`${API_BASE}/admin/users`, adminRequestOptions()).catch(() => []);
 
   const content = `
     <div class="row mb-4">
@@ -903,11 +913,11 @@ async function renderAdminPanel() {
     }
 
     try {
-      const response = await fetchJson(`${API_BASE}/admin/users`, {
+      const response = await fetchJson(`${API_BASE}/admin/users`, adminRequestOptions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, fullName })
-      });
+      }));
 
       const generatedPassword = response.user && response.user.password ? response.user.password : 'Check the user email';
       const emailStatus = response.emailSent
@@ -931,7 +941,7 @@ async function renderAdminPanel() {
       }
 
       try {
-        await fetchJson(`${API_BASE}/admin/users/${userId}`, { method: 'DELETE' });
+        await fetchJson(`${API_BASE}/admin/users/${userId}`, adminRequestOptions({ method: 'DELETE' }));
         renderAdminPanel();
       } catch (error) {
         window.alert(error.message || 'Unable to delete the user.');
@@ -946,11 +956,11 @@ async function renderAdminPanel() {
       if (!userId || !roleSelect) return;
 
       try {
-        await fetchJson(`${API_BASE}/admin/users/${userId}/role`, {
+        await fetchJson(`${API_BASE}/admin/users/${userId}/role`, adminRequestOptions({
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: roleSelect.value })
-        });
+        }));
         window.alert('User role updated successfully.');
         renderAdminPanel();
       } catch (error) {
