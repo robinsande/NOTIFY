@@ -1,6 +1,8 @@
 const API_BASE = 'https://backend-notify-3pvi.onrender.com/api';
 const APP_STATE_KEY = 'notify-app-state';
+const NAV_STATE_KEY = 'notify-nav-hidden';
 let currentUser = null;
+let navLinksHidden = localStorage.getItem(NAV_STATE_KEY) === 'true';
 
 function saveAppState(viewKey, authenticated = true) {
   try {
@@ -27,6 +29,26 @@ function clearAppState() {
     localStorage.removeItem(APP_STATE_KEY);
   } catch (error) {
     console.warn('Unable to clear app state', error);
+  }
+}
+
+function toggleNavLinks(forceState) {
+  navLinksHidden = typeof forceState === 'boolean' ? forceState : !navLinksHidden;
+  try {
+    localStorage.setItem(NAV_STATE_KEY, String(navLinksHidden));
+  } catch (error) {
+    console.warn('Unable to save navigation preference', error);
+  }
+
+  const shell = document.querySelector('.app-shell');
+  if (shell) {
+    shell.classList.toggle('nav-links-hidden', navLinksHidden);
+  }
+
+  const toggle = document.querySelector('[data-nav-links-toggle]');
+  if (toggle) {
+    toggle.setAttribute('aria-pressed', String(navLinksHidden));
+    toggle.textContent = navLinksHidden ? 'Show nav' : 'Hide nav';
   }
 }
 
@@ -478,7 +500,7 @@ function renderShell(activeKey, title, subtitle, content, actionsHtml = '') {
   const userRoleLabel = currentUser ? (currentUser.role === 'admin' ? 'Administrator' : 'Viewer') : 'Administrator';
 
   return `
-    <div class="app-shell">
+    <div class="app-shell ${navLinksHidden ? 'nav-links-hidden' : ''}">
       <aside class="sidebar ${sidebarOpen ? 'is-open' : ''}">
         <div>
           <div class="brand mb-4">
@@ -488,6 +510,10 @@ function renderShell(activeKey, title, subtitle, content, actionsHtml = '') {
               <p>Operations Control</p>
             </div>
             <button class="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded="${String(sidebarOpen)}" onclick="toggleSidebarDropdown()">${sidebarOpen ? '✕' : '☰'}</button>
+          </div>
+          <div class="sidebar-nav-header">
+            <span>Navigation</span>
+            <button class="btn btn-sm btn-outline-light" type="button" data-nav-links-toggle aria-pressed="${String(navLinksHidden)}" onclick="toggleNavLinks()">${navLinksHidden ? 'Show nav' : 'Hide nav'}</button>
           </div>
           <ul class="nav flex-column sidebar-nav">${navHtml}${adminPanelHtml}</ul>
         </div>

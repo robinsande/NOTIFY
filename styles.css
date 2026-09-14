@@ -128,6 +128,63 @@ h1, h2, h3, h4, h5, h6,
   flex-direction: column;
 }
 
+.sidebar-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: rgba(255,255,255,0.72);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0.3rem 0 0.45rem;
+}
+
+.sidebar-nav-header .btn {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.app-shell.nav-links-hidden .sidebar {
+  width: 92px;
+}
+
+.app-shell.nav-links-hidden .brand > div:not(.brand-mark),
+.app-shell.nav-links-hidden .sidebar-nav-header > span,
+.app-shell.nav-links-hidden .sidebar-footer .small,
+.app-shell.nav-links-hidden .sidebar .nav-link > span:not(.nav-icon) {
+  display: none;
+}
+
+.app-shell.nav-links-hidden .brand {
+  justify-content: center;
+}
+
+.app-shell.nav-links-hidden .sidebar-nav-header,
+.app-shell.nav-links-hidden .sidebar-footer {
+  align-items: center;
+}
+
+.app-shell.nav-links-hidden .sidebar-nav-header {
+  justify-content: center;
+}
+
+.app-shell.nav-links-hidden .sidebar .nav-link {
+  justify-content: center;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+.app-shell.nav-links-hidden .sidebar-nav-header .btn {
+  font-size: 0;
+}
+
+.app-shell.nav-links-hidden .sidebar-nav-header .btn::after {
+  content: '+';
+  font-size: 1rem;
+}
+
 .sidebar .nav-link {
   color: rgba(255,255,255,0.92);
   border-radius: 11px;
@@ -581,6 +638,39 @@ h1, h2, h3, h4, h5, h6,
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: 16px 0 40px rgba(91, 33, 182, 0.28);
     transition: transform 0.28s ease, opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  .app-shell.nav-links-hidden .sidebar {
+    width: min(82vw, 320px);
+  }
+
+  .app-shell.nav-links-hidden .brand > div:not(.brand-mark) {
+    display: block;
+  }
+
+  .app-shell.nav-links-hidden .sidebar-nav-header > span,
+  .app-shell.nav-links-hidden .sidebar-footer .small,
+  .app-shell.nav-links-hidden .sidebar .nav-link > span:not(.nav-icon) {
+    display: inline;
+  }
+
+  .app-shell.nav-links-hidden .brand {
+    justify-content: initial;
+  }
+
+  .app-shell.nav-links-hidden .sidebar-nav-header,
+  .app-shell.nav-links-hidden .sidebar-footer,
+  .app-shell.nav-links-hidden .sidebar .nav-link {
+    align-items: initial;
+    justify-content: initial;
+  }
+
+  .app-shell.nav-links-hidden .sidebar-nav-header .btn {
+    font-size: 0.7rem;
+  }
+
+  .app-shell.nav-links-hidden .sidebar-nav-header .btn::after {
+    content: none;
   }
 
   .sidebar.is-open,
