@@ -871,11 +871,17 @@ async function renderAdminPanel() {
                 <tr>
                   <td>${user.fullName}</td>
                   <td>${user.email}</td>
-                  <td><span class="badge ${user.role === 'admin' ? 'bg-danger' : 'bg-secondary'}">${user.role}</span></td>
+                  <td>
+                    <select class="form-select form-select-sm" data-role-user-id="${user.id}" ${user.id === currentUser.id ? 'disabled' : ''}>
+                      <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                      <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                  </td>
                   <td>${user.isFirstLogin ? '✓ Pending' : '—'}</td>
                   <td>${new Date(user.createdAt).toLocaleDateString()}</td>
                   <td>
-                    ${user.role !== 'admin' ? `<button class="btn btn-sm btn-outline-danger" type="button" data-delete-user-id="${user.id}">Delete</button>` : '<span class="text-muted small">Admin</span>'}
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-save-role-user-id="${user.id}" ${user.id === currentUser.id ? 'disabled' : ''}>Save role</button>
+                    ${user.id !== currentUser.id ? `<button class="btn btn-sm btn-outline-danger" type="button" data-delete-user-id="${user.id}">Delete</button>` : '<span class="text-muted small">Current account</span>'}
                   </td>
                 </tr>
               `).join('')}
@@ -932,6 +938,25 @@ async function renderAdminPanel() {
         renderAdminPanel();
       } catch (error) {
         window.alert(error.message || 'Unable to delete the user.');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-save-role-user-id]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const userId = button.getAttribute('data-save-role-user-id');
+      const roleSelect = document.querySelector(`[data-role-user-id="${userId}"]`);
+      if (!userId || !roleSelect) return;
+
+      try {
+        await fetchJson(`${API_BASE}/admin/users/${userId}/role`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: roleSelect.value })
+        });
+        renderAdminPanel();
+      } catch (error) {
+        window.alert(error.message || 'Unable to update the user role.');
       }
     });
   });
