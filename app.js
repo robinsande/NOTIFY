@@ -504,7 +504,7 @@ function renderShell(activeKey, title, subtitle, content, actionsHtml = '') {
       <aside class="sidebar ${sidebarOpen ? 'is-open' : ''}">
         <div>
           <div class="brand mb-4">
-            <img class="brand-mark" src="notify-logo.svg" alt="NOTIFY logo" />
+            <img class="brand-mark" src="notify-logo.png" alt="NOTIFY logo" />
             <div>
               <h3>NOTIFY</h3>
               <p>Operations Control</p>
@@ -549,7 +549,7 @@ function renderLogin() {
     <div class="login-wrap">
       <div class="card login-card p-4 p-lg-5">
         <div class="text-center mb-4">
-          <img class="brand-mark brand-mark-large mx-auto" src="notify-logo.svg" alt="NOTIFY logo" />
+          <img class="brand-mark brand-mark-large mx-auto" src="notify-logo.png" alt="NOTIFY logo" />
           <h3 class="mt-3 mb-1">Welcome back</h3>
           <p class="text-muted">Access the NOTIFY operations dashboard securely</p>
         </div>
@@ -791,7 +791,7 @@ function renderFirstLoginPasswordChange(userEmail) {
     <div class="login-wrap">
       <div class="card login-card p-4 p-lg-5">
         <div class="text-center mb-4">
-          <img class="brand-mark brand-mark-large mx-auto" src="notify-logo.svg" alt="NOTIFY logo" />
+          <img class="brand-mark brand-mark-large mx-auto" src="notify-logo.png" alt="NOTIFY logo" />
           <h3 class="mt-3 mb-1">Set Your Password</h3>
           <p class="text-muted">This is your first login. Please set a new password.</p>
         </div>
