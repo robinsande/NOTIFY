@@ -85,7 +85,7 @@ function navigateToRoute(routeKey) {
   };
 
   const target = routeMap[normalized] || renderDashboard;
-  const nextHash = normalized === 'dashboard' ? '#/dashboard' : `#/` + normalized;
+  const nextHash = normalized === 'dashboard' ? '' : `#/` + normalized;
   if (window.location.hash !== nextHash) {
     window.location.hash = nextHash;
   }
@@ -837,11 +837,6 @@ async function renderAdminPanel() {
                 <input type="email" class="form-control" name="email" placeholder="user@example.com" />
               </div>
               <div class="col-12">
-                <label class="form-label">Temporary Password</label>
-                <input type="text" class="form-control" name="tempPassword" placeholder="Optional: leave blank to auto-generate" />
-                <small class="text-muted">If left blank, the system generates a temporary password and the user must change it on first login.</small>
-              </div>
-              <div class="col-12">
                 <button type="submit" class="btn btn-primary">Create User</button>
                 <div id="create-user-feedback" class="mt-2"></div>
               </div>
@@ -872,7 +867,7 @@ async function renderAdminPanel() {
                   <td>${user.fullName}</td>
                   <td>${user.email}</td>
                   <td>
-                    <select class="form-select form-select-sm" data-role-user-id="${user.id}" ${user.id === currentUser.id ? 'disabled' : ''}>
+                    <select class="form-select form-select-sm" data-role-user-id="${user.id}" ${String(user.id) === String(currentUser.id) ? 'disabled' : ''}>
                       <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
                       <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
@@ -880,8 +875,8 @@ async function renderAdminPanel() {
                   <td>${user.isFirstLogin ? '✓ Pending' : '—'}</td>
                   <td>${new Date(user.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <button class="btn btn-sm btn-outline-primary" type="button" data-save-role-user-id="${user.id}" ${user.id === currentUser.id ? 'disabled' : ''}>Save role</button>
-                    ${user.id !== currentUser.id ? `<button class="btn btn-sm btn-outline-danger" type="button" data-delete-user-id="${user.id}">Delete</button>` : '<span class="text-muted small">Current account</span>'}
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-save-role-user-id="${user.id}" ${String(user.id) === String(currentUser.id) ? 'disabled' : ''}>Save role</button>
+                    ${String(user.id) !== String(currentUser.id) ? `<button class="btn btn-sm btn-outline-danger" type="button" data-delete-user-id="${user.id}">Delete</button>` : '<span class="text-muted small">Current account</span>'}
                   </td>
                 </tr>
               `).join('')}
@@ -901,7 +896,6 @@ async function renderAdminPanel() {
     event.preventDefault();
     const fullName = form.elements.fullName.value;
     const email = form.elements.email.value;
-    const tempPassword = form.elements.tempPassword.value;
 
     if (!email) {
       feedback.innerHTML = '<div class="alert alert-danger">Email is required</div>';
@@ -912,11 +906,12 @@ async function renderAdminPanel() {
       const response = await fetchJson(`${API_BASE}/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fullName, tempPassword })
+        body: JSON.stringify({ email, fullName })
       });
 
-      const generatedPassword = response.user && response.user.password ? response.user.password : tempPassword || 'Generated password not shown';
-      feedback.innerHTML = `<div class="alert alert-success">User created successfully. Temporary password: <strong>${generatedPassword}</strong></div>`;
+      const generatedPassword = response.user && response.user.password ? response.user.password : 'Check the user email';
+      const emailStatus = response.emailSent ? 'The temporary password was emailed to the user.' : 'Brevo email is not configured, so send this password securely to the user.';
+      feedback.innerHTML = `<div class="alert alert-success">User created successfully.<br>Temporary password: <strong>${generatedPassword}</strong><br><small>${emailStatus}</small></div>`;
       form.reset();
       setTimeout(() => renderAdminPanel(), 2000);
     } catch (error) {
@@ -954,6 +949,7 @@ async function renderAdminPanel() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: roleSelect.value })
         });
+        window.alert('User role updated successfully.');
         renderAdminPanel();
       } catch (error) {
         window.alert(error.message || 'Unable to update the user role.');
