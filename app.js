@@ -925,7 +925,7 @@ async function renderAdminPanel() {
         : `The temporary password was not emailed. ${response.emailError || 'Configure Brevo in the backend deployment settings.'}`;
       feedback.innerHTML = `<div class="alert alert-success">User created successfully.<br>Temporary password: <strong>${generatedPassword}</strong><br><small>${emailStatus}</small></div>`;
       form.reset();
-      setTimeout(() => renderAdminPanel(), 2000);
+      setTimeout(() => renderAdminPanel(), 30 * 60 * 1000);
     } catch (error) {
       feedback.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
     }
