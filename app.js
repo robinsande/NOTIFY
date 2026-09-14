@@ -910,7 +910,9 @@ async function renderAdminPanel() {
       });
 
       const generatedPassword = response.user && response.user.password ? response.user.password : 'Check the user email';
-      const emailStatus = response.emailSent ? 'The temporary password was emailed to the user.' : 'Brevo email is not configured, so send this password securely to the user.';
+      const emailStatus = response.emailSent
+        ? 'The temporary password was emailed to the user.'
+        : `The temporary password was not emailed. ${response.emailError || 'Configure Brevo in the backend deployment settings.'}`;
       feedback.innerHTML = `<div class="alert alert-success">User created successfully.<br>Temporary password: <strong>${generatedPassword}</strong><br><small>${emailStatus}</small></div>`;
       form.reset();
       setTimeout(() => renderAdminPanel(), 2000);
