@@ -2,11 +2,20 @@ const API_BASE = 'https://backend-notify-3pvi.onrender.com/api';
 const APP_STATE_KEY = 'notify-app-state';
 const NAV_STATE_KEY = 'notify-nav-hidden';
 let currentUser = null;
+let currentSessionToken = '';
 let navLinksHidden = localStorage.getItem(NAV_STATE_KEY) === 'true';
+
+function recordClientTiming(name, startedAt, details = {}) {
+  const durationMs = Math.round(performance.now() - startedAt);
+  const entry = { name, durationMs, ...details };
+  console.info('[NOTIFY_TIMING]', entry);
+  window.__notifyTimings = [...(window.__notifyTimings || []), entry];
+  return durationMs;
+}
 
 function saveAppState(viewKey, authenticated = true) {
   try {
-    localStorage.setItem(APP_STATE_KEY, JSON.stringify({ view: viewKey, authenticated, user: currentUser }));
+    localStorage.setItem(APP_STATE_KEY, JSON.stringify({ view: viewKey, authenticated, user: currentUser, sessionToken: currentSessionToken }));
   } catch (error) {
     console.warn('Unable to save app state', error);
   }
@@ -15,6 +24,7 @@ function saveAppState(viewKey, authenticated = true) {
 function restoreAppState() {
   try {
     const state = JSON.parse(localStorage.getItem(APP_STATE_KEY) || '{}');
+    currentSessionToken = state.sessionToken || '';
     if (state.user) {
       currentUser = state.user;
     }
@@ -25,6 +35,7 @@ function restoreAppState() {
 }
 
 function clearAppState() {
+  currentSessionToken = '';
   try {
     localStorage.removeItem(APP_STATE_KEY);
   } catch (error) {
@@ -52,7 +63,13 @@ function toggleNavLinks(forceState) {
   }
 }
 
-function logoutUser() {
+async function logoutUser() {
+  if (currentSessionToken) {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${currentSessionToken}` }
+    }).catch(() => {});
+  }
   currentUser = null;
   clearAppState();
   if (window.location) {
@@ -153,17 +170,29 @@ const navigationItems = [
 ];
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || 'Request failed');
-  }
+  const startedAt = performance.now();
+  const requestName = new URL(url, window.location.href).pathname;
+  const headers = {
+    ...(options.headers || {}),
+    ...(currentSessionToken ? { Authorization: `Bearer ${currentSessionToken}` } : {})
+  };
+  try {
+    const response = await fetch(url, { ...options, headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || 'Request failed');
+    }
 
-  const payload = await response.json();
-  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    payload.ok = response.ok;
+    const payload = await response.json();
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      payload.ok = response.ok;
+    }
+    recordClientTiming('fetch', startedAt, { requestName, status: response.status });
+    return payload;
+  } catch (error) {
+    recordClientTiming('fetch', startedAt, { requestName, error: error.message });
+    throw error;
   }
-  return payload;
 }
 
 function adminRequestOptions(options = {}) {
@@ -682,6 +711,8 @@ function renderLogin() {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const signInStartedAt = performance.now();
+    console.info('[NOTIFY_TIMING]', { name: 'signin-submit' });
     const email = form.elements.email.value;
     const password = form.elements.password.value;
     const fullName = form.elements.fullName.value;
@@ -767,7 +798,9 @@ function renderLogin() {
 
       if (response && response.ok && response.user) {
         currentUser = response.user;
+        currentSessionToken = response.sessionToken || '';
         saveAppState('dashboard', true);
+        recordClientTiming('signin-response-to-redirect', signInStartedAt, { route: 'dashboard' });
         
         // Force password change on first login for viewers
         if (response.user.isFirstLogin) {
@@ -775,7 +808,8 @@ function renderLogin() {
           return;
         }
         
-        renderDashboard();
+        const redirectStartedAt = performance.now();
+        renderDashboard().finally(() => recordClientTiming('signin-redirect-fired', redirectStartedAt, { route: 'dashboard' }));
         return;
       }
 
@@ -997,7 +1031,15 @@ async function renderAdminPanel() {
 }
 
 async function renderDashboard() {
+  const routeStartedAt = performance.now();
+  console.info('[NOTIFY_TIMING]', { name: 'route-mount', route: 'dashboard' });
   saveAppState('dashboard', true);
+  document.getElementById('app').innerHTML = renderShell(
+    'dashboard',
+    'Dashboard',
+    'Loading your operations workspace...',
+    '<div class="card p-4"><div class="placeholder-glow"><span class="placeholder col-7"></span><span class="placeholder col-4"></span><span class="placeholder col-10"></span></div></div>'
+  );
 
   const summary = await fetchJson(`${API_BASE}/dashboard/summary`).catch(() => ({
     totalEvents: 0,
@@ -1229,6 +1271,7 @@ async function renderDashboard() {
   `;
 
   document.getElementById('app').innerHTML = renderShell('dashboard', 'Dashboard', 'Access the core operations modules from a simplified control surface.', content);
+  recordClientTiming('route-interactive', routeStartedAt, { route: 'dashboard' });
 }
 
 async function renderEvents() {
@@ -2270,24 +2313,25 @@ async function deleteAttendee(attendeeId) {
   renderAttendees();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const hashRoute = window.location.hash.replace(/^#\/?/, '').trim();
   const savedState = restoreAppState();
   const validRoutes = ['dashboard','events','calendar','tasks','attendees','reminders','documents','reports','departments','eventTypes','admin'];
   const hasSavedUser = savedState.authenticated && savedState.user && savedState.view;
 
   try {
-    const startupRender = hashRoute && validRoutes.includes(hashRoute)
-      ? navigateToRoute(hashRoute)
-      : hasSavedUser
-        ? navigateToSavedView(savedState.view)
-        : renderLogin();
-
-    Promise.resolve(startupRender).catch((error) => {
-      console.error('Unable to load NOTIFY', error);
-      clearAppState();
+    if (!hasSavedUser || !currentSessionToken) {
       renderLogin();
-    });
+      return;
+    }
+
+    const sessionStartedAt = performance.now();
+    const session = await fetchJson(`${API_BASE}/auth/session`);
+    currentUser = session.user;
+    recordClientTiming('session-restore', sessionStartedAt, { route: hashRoute || savedState.view });
+    saveAppState(savedState.view, true);
+    const targetRoute = hashRoute && validRoutes.includes(hashRoute) ? hashRoute : savedState.view;
+    await navigateToRoute(targetRoute);
   } catch (error) {
     console.error('Unable to load NOTIFY', error);
     clearAppState();
@@ -2296,5 +2340,16 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('hashchange', () => {
-  handleRouteFromHash();
+  if (!currentUser || !currentSessionToken) {
+    renderLogin();
+    return;
+  }
+
+  try {
+    handleRouteFromHash();
+  } catch (error) {
+    console.error('Unable to change NOTIFY route', error);
+      clearAppState();
+      renderLogin();
+  }
 });
